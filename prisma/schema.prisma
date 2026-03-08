@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model SessionSummary {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  sessionId   String   @unique
+  handsPlayed Int
+  netBB       Float
+  netChips    Int      @default(0)
+  vpip        Float
+  pfr         Float
+  wtsd        Float
+  aiLineup    String   // JSON snapshot of archetype IDs + buy-ins used
+  notes       String?
+}
+
+model SessionState {
+  id          String   @id @default(cuid())
+  updatedAt   DateTime @updatedAt
+  sessionId   String   @unique
+  gameState   String   // JSON snapshot of full GameState
+  handNumber  Int
+  config      String   // JSON snapshot of session config at start
+}
+
+model PlayerProfile {
+  id              String   @id @default(cuid())
+  updatedAt       DateTime @updatedAt
+  playerId        String   @unique @default("human")
+  totalHands      Int      @default(0)
+  totalSessions   Int      @default(0)
+  lifetimeNetBB   Float    @default(0)
+  avgVpip         Float    @default(0)
+  avgPfr          Float    @default(0)
+  avgWtsd         Float    @default(0)
+  trends          String?  // JSON: { vpip: number[], pfr: number[] } last N sessions
+}
+
+model ChatLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  sessionId  String
+  sender     String   // archetype ID, 'human', or 'dealer'
+  message    String
+  visibility String   @default("public") // 'public' | 'human_only'
+  handNumber Int
+}

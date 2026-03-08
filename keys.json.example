@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy this file to keys.json and fill in real values. keys.json is gitignored.",
+  "provider": {
+    "aws": {
+      "profile": "eonar_dev003",
+      "region": "us-east-1",
+      "modelId": "anthropic.claude-haiku-4-5"
+    }
+  }
+}
