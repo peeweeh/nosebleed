@@ -35,7 +35,7 @@ export default function ActionBar({
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-3 px-6 py-4 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-t border-zinc-700/60 transition-opacity ${
+      className={`flex flex-wrap items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-t border-zinc-700/60 transition-opacity ${
         disabled ? 'opacity-40 pointer-events-none' : 'opacity-100'
       }`}
     >

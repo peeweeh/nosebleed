@@ -15,11 +15,17 @@ export interface LegalActions {
 
 export function getLegalActions(state: GameState, seatId: SeatId): LegalActions {
   const seat = state.seats[seatId]
+
+  // Already all-in or bust — no actions needed
+  if (seat.isAllIn || seat.stack === 0) {
+    return { canFold: false, canCheck: false, canCall: false, callAmount: 0, canBet: false, canRaise: false, minRaise: 0, maxRaise: 0 }
+  }
+
   const facingBet = maxBetOnStreet(state) - seat.currentBet
 
   const canCheck = facingBet === 0
   const canFold = true  // always legal to fold on your turn
-  const canCall = facingBet > 0 && facingBet < seat.stack
+  const canCall = facingBet > 0 && facingBet <= seat.stack
   const callAmount = Math.min(facingBet, seat.stack)
   const canBet = facingBet === 0 && seat.stack > 0
   const canRaise = facingBet > 0 && seat.stack > facingBet

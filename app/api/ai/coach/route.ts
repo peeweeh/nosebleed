@@ -29,7 +29,21 @@ function stateContext(state: GameState): string {
     .map(s => `${s.id}: stack=${s.stack} bet=${s.currentBet}`)
     .join(', ')
 
+  const humanActions = state.actionsThisStreet
+    .filter(e => e.seatId === 'human')
+    .map(e => e.action.amount != null ? `${e.action.type} ${e.action.amount}` : e.action.type)
+    .join(', ')
+
+  const outcome = humanSeat.isFolded
+    ? 'folded'
+    : state.winners?.includes('human')
+      ? 'won the pot'
+      : state.winners
+        ? 'lost (did not win)'
+        : 'still in hand'
+
   return [
+    `Hand #: ${state.handNumber}`,
     `Street: ${state.street}`,
     `Board: ${board}`,
     `Your hole cards: ${holeStr}`,
@@ -37,6 +51,8 @@ function stateContext(state: GameState): string {
     `Pot: ${state.pot.main}`,
     `Current bet: ${facingBet}`,
     `Active opponents: ${others || 'none'}`,
+    `Your action(s) this street: ${humanActions || (humanSeat.lastAction?.type ?? 'none')}`,
+    `Your outcome: ${outcome}`,
   ].join('\n')
 }
 

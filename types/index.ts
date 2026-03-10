@@ -118,3 +118,12 @@ export interface SessionConfig {
   speed: 'slow' | 'normal' | 'fast'
   showAICards: 'always' | 'showdown' | 'never'
 }
+
+// ─── Ledger ──────────────────────────────────────────────────────────────────
+
+export interface LedgerEntry {
+  lender: SeatId | 'house'
+  borrower: SeatId
+  amount: number
+  handNumber: number
+}

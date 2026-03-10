@@ -27,14 +27,13 @@ interface Props {
   revealCards?: boolean
   onRebuy?: () => void
   lastQuip?: string
-  coachMessage?: string
 }
 
-export default function SeatCard({ seat, isActive, revealCards = false, onRebuy, lastQuip, coachMessage }: Props) {
+export default function SeatCard({ seat, isActive, revealCards = false, onRebuy, lastQuip }: Props) {
   const isFolded = seat.isFolded
   const isHuman = seat.id === 'human'
   const emoji = isHuman ? '🎯' : (seat.archetypeId ? (ARCHETYPE_EMOJI[seat.archetypeId] ?? '🃏') : '🃏')
-  const quip = !isHuman ? lastQuip : coachMessage
+  const quip = !isHuman ? lastQuip : undefined
 
   const bgGradient = isFolded
     ? 'bg-zinc-900'
@@ -47,12 +46,11 @@ export default function SeatCard({ seat, isActive, revealCards = false, onRebuy,
   return (
     <div className="flex flex-col items-center">
 
+      {/* AI quip bubble — above card */}
       {quip ? (
-        <div className={`relative max-w-[380px] rounded-2xl px-4 py-2.5 mb-2 text-sm leading-snug text-center shadow-lg ${
-          isHuman ? 'bg-violet-950/95 border border-violet-500/70 text-violet-100' : 'bg-zinc-800/95 border border-zinc-500/60 text-zinc-100'
-        }`}>
+        <div className="relative max-w-[380px] rounded-2xl px-4 py-2.5 mb-2 text-sm leading-snug text-center shadow-lg bg-zinc-800/95 border border-zinc-500/60 text-zinc-100">
           {quip}
-          <span className={`absolute left-1/2 -translate-x-1/2 -bottom-[8px] w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent ${ isHuman ? 'border-t-[8px] border-t-violet-500/70' : 'border-t-[8px] border-t-zinc-500/60' }`} />
+          <span className="absolute left-1/2 -translate-x-1/2 -bottom-[8px] w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-zinc-500/60" />
         </div>
       ) : (
         <div className="mb-2 h-[40px]" />

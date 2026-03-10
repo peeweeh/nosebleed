@@ -4,17 +4,60 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useGameStore, setAISpeed, type SpeedKey } from '@/stores/gameStore'
 import { useChatStore } from '@/stores/chatStore'
-import { type GameState, type SessionConfig, type SeatId, type Seat, type PlayerAction, type MessageVisibility, type ChatMessage } from '@/types'
+import { type GameState, type SessionConfig, type SeatId, type Seat, type PlayerAction, type MessageVisibility, type ChatMessage, type Card } from '@/types'
 import { ARCHETYPES } from '@/constants/archetypes'
 import { SEAT_ORDER } from '@/constants/game'
 import { getLegalActions, type LegalActions } from '@/lib/game/actions'
 import { registerDealerVoice } from '@/lib/ai/dealerVoice'
 import { registerCoach } from '@/lib/ai/coach'
 import { broadcastToTable } from '@/lib/ai/tableChat'
+import { onDealerEvent } from '@/lib/game/engine'
 import TableOval from '@/components/TableOval'
 import ActionBar from '@/components/ActionBar'
 import ChatFeed from '@/components/ChatFeed'
 import ChatInput from '@/components/ChatInput'
+
+function formatActionForLog(action: PlayerAction): string {
+  if (action.type === 'bet' || action.type === 'raise') {
+    return `${action.type} ${action.amount ?? 0}`
+  }
+  if (action.type === 'all-in') {
+    return action.amount != null ? `all-in ${action.amount}` : 'all-in'
+  }
+  return action.type
+}
+
+function formatCard(card: Card): string {
+  const suit = card.suit === 'spades'
+    ? 's'
+    : card.suit === 'hearts'
+      ? 'h'
+      : card.suit === 'diamonds'
+        ? 'd'
+        : 'c'
+  return `${card.rank}${suit}`
+}
+
+function deriveNextMood(prev: GameState, seatId: SeatId, stackAfter: number): string {
+  const seat = prev.seats[seatId]
+  if (!seat) return 'neutral'
+  if (seatId === 'human') return seat.mood ?? 'neutral'
+
+  const stackBefore = seat.stack
+  const wonHand = (prev.winners ?? []).includes(seatId)
+  const busted = stackBefore > 0 && stackAfter === 0
+  const heavyLoss = stackBefore > 0 && stackAfter <= Math.floor(stackBefore * 0.6)
+  const jammedThisHand = prev.actionsThisStreet.some(
+    (e) => e.seatId === seatId && e.action.type === 'all-in',
+  )
+
+  if (wonHand) return 'confident'
+  if (busted) return 'tilted'
+  if (heavyLoss) return 'pissed_off'
+  if (jammedThisHand && !wonHand) return 'irritated'
+  if (seat.isFolded && !wonHand) return 'cautious'
+  return 'neutral'
+}
 
 function buildInitialState(sessionId: string, config: SessionConfig): GameState {
   const seats = Object.fromEntries(
@@ -66,14 +109,16 @@ function buildNextHandState(prev: GameState, config: SessionConfig): GameState {
   const seats = Object.fromEntries(
     config.seats.map((sc): [SeatId, Seat] => {
       const prevSeat = prev.seats[sc.seatId]
-      const stack = prevSeat?.stack ?? sc.buyIn
+      // AI players auto-rebuy 1k when broke; human must rebuy manually
+      const rawStack = prevSeat?.stack ?? sc.buyIn
+      const stack = (rawStack === 0 && sc.seatId !== 'human') ? 1000 : rawStack
       return [
         sc.seatId,
         {
           id: sc.seatId,
           archetypeId: sc.seatId === 'human' ? null : sc.archetypeId,
           name: prevSeat?.name ?? (sc.seatId === 'human' ? 'You' : (sc.archetypeId ? (ARCHETYPES[sc.archetypeId]?.name ?? sc.seatId) : sc.seatId)),
-          mood: 'neutral',
+          mood: deriveNextMood(prev, sc.seatId, stack),
           stack,
           holeCards: null,
           isActive: stack > 0,
@@ -113,9 +158,13 @@ export default function GamePage() {
   const [config, setConfig] = useState<SessionConfig | null>(null)
   const [speed, setSpeed] = useState<SpeedKey>('normal')
   const [revealCards, setRevealCards] = useState(false)
+  const [copiedMoves, setCopiedMoves] = useState(false)
   const [totalRebought, setTotalRebought] = useState(0)
   const voiceRegistered = useRef(false)
+  const moveLogRegistered = useRef(false)
+  const moveLogRef = useRef<string[]>([])
   const initialBuyIn = useRef<number>(0)
+  const stackBeforeHand = useRef<number>(0)
 
   // Load config and init first hand
   useEffect(() => {
@@ -144,16 +193,130 @@ export default function GamePage() {
       (msg) => addMessage(msg),
       () => useGameStore.getState().state,
     )
+
+    if (!moveLogRegistered.current) {
+      moveLogRegistered.current = true
+      onDealerEvent((event) => {
+        if (event.type === 'HAND_START') {
+          moveLogRef.current = [`Hand #${event.state.handNumber}`]
+          return
+        }
+        if (event.type === 'STREET_DEALT') {
+          const board = event.state.board.length
+            ? event.state.board.map(formatCard).join(' ')
+            : 'none'
+          moveLogRef.current.push(`Street: ${event.state.street} | Board: ${board}`)
+          return
+        }
+        if ((event.type === 'ACTION_TAKEN' || event.type === 'FOLD') && event.seatId && event.action) {
+          const seatName = event.seatId === 'human'
+            ? 'You'
+            : (event.state.seats[event.seatId]?.name ?? event.seatId)
+          moveLogRef.current.push(`${seatName}: ${formatActionForLog(event.action)}`)
+          return
+        }
+        if (event.type === 'HAND_COMPLETE') {
+          const winners = (event.state.winners ?? [])
+            .map((w) => w === 'human' ? 'You' : (event.state.seats[w]?.name ?? w))
+            .join(', ')
+          moveLogRef.current.push(`Winners: ${winners || 'none'}`)
+        }
+      })
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function handleCopyMoves() {
+    if (!state || state.street !== 'complete') return
+
+    const lines = moveLogRef.current.length > 0
+      ? moveLogRef.current
+      : [`Hand #${state?.handNumber ?? 0}`, 'No moves recorded yet.']
+
+    const river = state.board.length > 0
+      ? state.board.map(formatCard).join(' ')
+      : 'none'
+
+    const hands = (Object.entries(state.seats) as [SeatId, Seat][]).map(([id, seat]) => {
+      const label = id === 'human' ? 'You' : (seat.name ?? id)
+      const hand = seat.holeCards
+        ? seat.holeCards.map(formatCard).join(' ')
+        : '-- --'
+      return `${label}: ${hand}`
+    })
+
+    const payload = [
+      ...lines,
+      '---',
+      `Final board (river): ${river}`,
+      'Hands:',
+      ...hands,
+    ].join('\n')
+    try {
+      await navigator.clipboard.writeText(payload)
+      setCopiedMoves(true)
+      setTimeout(() => setCopiedMoves(false), 1200)
+    } catch {
+      addMessage({
+        id: `copy-failed-${Date.now()}`,
+        variant: 'dealer',
+        sender: 'dealer',
+        senderLabel: 'Dealer',
+        message: 'Clipboard blocked. Copy failed.',
+        visibility: 'human_only',
+        timestamp: Date.now(),
+      })
+    }
+  }
+
   // Auto-reveal cards when hand ends, hide again when next hand starts
+  // Log score ~8s after hand completes so the coach posthand analysis is in the feed
   const prevStreetRef = useRef<string | null>(null)
+  const scoreLoggedHandRef = useRef<number>(-1)
   useEffect(() => {
     if (!state) return
     if (state.street === 'complete' && prevStreetRef.current !== 'complete') {
       setRevealCards(true)
+      // Snapshot everything we need now (state/refs may change before the timer fires)
+      const snapHand = state.handNumber
+      const snapStack = state.seats['human']?.stack ?? 0
+      const snapStackBefore = stackBeforeHand.current
+      const snapWinners = state.winners ?? []
+      const snapFolded = state.seats['human']?.isFolded ?? false
+      const snapHole = state.seats['human']?.holeCards
+        ? state.seats['human'].holeCards!.map(c => `${c.rank}${c.suit}`).join(' ')
+        : '—'
+      const snapBoard = state.board.length > 0
+        ? state.board.map(c => `${c.rank}${c.suit}`).join(' ')
+        : 'none'
+      // Wait 8s for the coach's posthand message to land in the feed, then log.
+      // Do NOT return a cleanup — street will change to 'preflop' before the timer
+      // fires and React would cancel it on cleanup, preventing the log from saving.
+      setTimeout(() => {
+        if (scoreLoggedHandRef.current === snapHand) return // already logged
+        scoreLoggedHandRef.current = snapHand
+        const allMsgs = useChatStore.getState().messages
+        const coachMsgs = allMsgs.filter(m => m.variant === 'coach')
+        const lastCoach = coachMsgs[coachMsgs.length - 1]?.message ?? '—'
+        void fetch('/api/log/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            handNumber: snapHand,
+            humanStack: snapStack,
+            stackBefore: snapStackBefore,
+            winners: snapWinners,
+            humanFolded: snapFolded,
+            holeCards: snapHole,
+            board: snapBoard,
+            coachAnalysis: lastCoach,
+          }),
+        })
+      }, 8000)
     } else if (state.street !== 'complete' && prevStreetRef.current === 'complete') {
       setRevealCards(false)
+    } else if (state.street === 'preflop' && prevStreetRef.current !== 'preflop') {
+      // Record stack at start of each new hand
+      stackBeforeHand.current = state.seats['human']?.stack ?? 0
     }
     prevStreetRef.current = state.street
   }, [state?.street])
@@ -373,13 +536,28 @@ export default function GamePage() {
             {/* Reveal cards toggle */}
             <button
               onClick={() => setRevealCards(v => !v)}
+              title={revealCards ? 'Hide cards' : 'Show cards'}
               className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wide border transition-all ${
                 revealCards
                   ? 'bg-amber-500/20 border-amber-500/60 text-amber-400'
                   : 'border-zinc-700 text-zinc-600 hover:text-zinc-400'
               }`}
             >
-              {revealCards ? '👁 Cards On' : '👁 Cards Off'}
+              👁
+            </button>
+            <button
+              onClick={handleCopyMoves}
+              title={isHandOver ? 'Copy hand moves' : 'Available when hand completes'}
+              disabled={!isHandOver}
+              className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wide border transition-all ${
+                copiedMoves
+                  ? 'bg-teal-500/20 border-teal-500/60 text-teal-300'
+                  : isHandOver
+                    ? 'border-zinc-700 text-zinc-600 hover:text-zinc-400'
+                    : 'border-zinc-800 text-zinc-700 cursor-not-allowed opacity-50'
+              }`}
+            >
+              {copiedMoves ? '✓' : '📋'}
             </button>
             {isHandOver && (
               <button
@@ -408,12 +586,14 @@ export default function GamePage() {
         </div>
 
         {/* Action bar */}
-        <ActionBar
-          legal={legal}
-          humanStack={humanSeat?.stack ?? 0}
-          isHumanTurn={isHumanTurn && !isAIThinking && !isHandOver}
-          onAction={handleHumanAction}
-        />
+        {!isHandOver && (
+          <ActionBar
+            legal={legal}
+            humanStack={humanSeat?.stack ?? 0}
+            isHumanTurn={isHumanTurn && !isAIThinking && !isHandOver}
+            onAction={handleHumanAction}
+          />
+        )}
       </div>
 
       {/* Right: Chat panel */}

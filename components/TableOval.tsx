@@ -80,7 +80,6 @@ export default function TableOval({
               revealCards={revealCards}
               onRebuy={onRebuy ? () => onRebuy(seat.id as SeatId) : undefined}
               lastQuip={seat.id !== 'human' ? latestMessages[seat.id] : undefined}
-              coachMessage={seat.id === 'human' ? latestMessages['coach'] : undefined}
             />
           </div>
         )

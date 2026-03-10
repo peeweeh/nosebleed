@@ -50,7 +50,21 @@ function stateContext(state: GameState): string {
     .map((s) => `${s.id}: stack=${s.stack} bet=${s.currentBet}`)
     .join(', ')
 
+  const humanActions = state.actionsThisStreet
+    .filter((e) => e.seatId === 'human')
+    .map((e) => e.action.amount != null ? `${e.action.type} ${e.action.amount}` : e.action.type)
+    .join(', ')
+
+  const outcome = humanSeat.isFolded
+    ? 'folded'
+    : state.winners?.includes('human')
+      ? 'won the pot'
+      : state.winners
+        ? 'lost (did not win)'
+        : 'still in hand'
+
   return [
+    `Hand #: ${state.handNumber}`,
     `Street: ${state.street}`,
     `Board: ${board}`,
     `Your hole cards: ${holeStr}`,
@@ -58,6 +72,8 @@ function stateContext(state: GameState): string {
     `Pot: ${state.pot.main}`,
     `Current bet: ${facingBet}`,
     `Active opponents: ${others || 'none'}`,
+    `Your action(s) this street: ${humanActions || (humanSeat.lastAction?.type ?? 'none')}`,
+    `Your outcome: ${outcome}`,
   ].join('\n')
 }
 
@@ -120,6 +136,11 @@ export function registerCoach(
     // fires inside startHand() before initHand calls set({ state })).
     const state = event.state ?? getState()
     if (!state) return
+
+    // No coach hint on the very first hand — nothing has happened yet.
+    // No coach hint on preflop street_dealt — no community cards to discuss.
+    if (event.type === 'STREET_DEALT' &&
+       (state.handNumber <= 1 || state.street === 'preflop')) return
 
     let msg: ChatMessage | null = null
 

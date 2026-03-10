@@ -1,73 +1,45 @@
-# Nosebleed 🃏
+# Nosebleed
 
-> **No-limit Texas Hold'em trainer.** Play against 4 AI opponents with distinct personalities, coached in real-time by an AI modeled after Dollar Bill from *Billions*.
+Train like the chips are real.
+
+Nosebleed is a no-limit Texas Hold'em training sim where the table fights back. You play full hands against personality-driven opponents, get live table talk, and receive blunt coach feedback while the hand is still hot.
+
+![Nosebleed Table](images/nosebleed.png)
 
 ![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat&logo=nextdotjs)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css&logoColor=white)
-![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock-FF9900?style=flat&logo=amazon-aws&logoColor=white)
 ![Zustand](https://img.shields.io/badge/Zustand-orange?style=flat)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat&logo=prisma&logoColor=white)
 
----
+## What Makes It Different
 
-## What It Is
+- Full hand loop: blinds, betting rounds, all-in spots, showdown, stack carry-over.
+- Personality opponents: style, ego, tilt, and mood influence decisions.
+- Live table chat: AI opponents react to pressure, punts, and momentum shifts.
+- Coach in your corner: hand-aware advice and post-hand rating/analysis.
+- Debug-friendly tools: one-click hand move copy with river + shown hands.
 
-A fast, minimal poker simulator for serious skill development:
+## Opponent Pool
 
-- **Full NLHE engine** — deal, bet, raise, fold, all-in, side pots, showdown, stack tracking across hands
-- **4 AI opponents** with real personalities — each thinks, talks, and tilts differently
-- **Dollar Bill coach** — blunt real-time feedback on every decision, tilt detection, session summary
-- **Alive table** — AIs talk to each other, needle you, react to rebuys, comment on big pots
-- **Inline speech bubbles** — each player's latest quip floats above their seat in real time
-- **Rebuy system** — AI opponents can rebuy when busted; you can top up mid-session; all announced to the table
-- **Session memory** — hand results, P&L, and coach notes persist across hands
+Pick from a larger archetype pool in the lobby, then seat 4 opponents per session.
 
----
+- Honey: Southern charm LAG pressure.
+- Professor: GTO pedant, low-noise TAG lines.
+- Bull: high aggression, high volatility.
+- Ghost: ultra-tight trap specialist.
+- Remy: patient road gambler.
+- Viper: cold precision LAG.
+- Cleo: theatrical slowplay traps.
+- Luna: read-heavy chaos lines.
+- Duchess: selective and punishing in big pots.
 
-## Stack
+## Quick Start
 
-| Layer | Tech |
-|-------|------|
-| Frontend | Next.js 15 (App Router), React 19, TypeScript, TailwindCSS |
-| State | Zustand v5 |
-| AI | AWS Bedrock — Anthropic Claude (via `@aws-sdk/client-bedrock-runtime`) |
-| Database | SQLite via Prisma |
-| Validation | Zod |
-
----
-
-## AI Opponents
-
-| Seat | Archetype | Emoji | Personality |
-|------|-----------|-------|-------------|
-| A1 | Honey | 🍯 | Sweet up front, methodical, quietly dangerous |
-| A2 | Professor | 🎓 | Tight nit — rarely plays, rarely speaks, wins quietly |
-| A3 | Bull | 🐂 | Loose-aggressive, relentless pressure, loves chaos |
-| A4 | Ghost | 👻 | Stone killer LAG — barely speaks, always dangerous |
-
-Each opponent has independent tilt state, talk frequency, and strategy profile. They react to each other, to your bets, and to the board in character.
-
----
-
-## Coach: Dollar Bill 💰
-
-Modeled after Dollar Bill Stearn from *Billions*. Blunt. Tactical. Obsessed with your leaks.
-
-- Tags every decision: `good` / `close` / `mistake` / `big_mistake`
-- Detects tilt from your betting patterns and chat
-- Reads your history: "You've been running loose for three sessions. Tonight we tighten up."
-- End-of-session report: 10-category scores + summary + next focus
-
----
-
-## Getting Started
-
-### 1. Prerequisites
+### 1. Requirements
 
 - Node.js 20+
-- An AWS account with Bedrock access (Anthropic Claude enabled in your region)
-- AWS credentials configured locally: `~/.aws/credentials` with a named profile
+- npm
 
 ### 2. Install
 
@@ -77,131 +49,79 @@ cd nosebleed
 npm install
 ```
 
-### 3. Configure environment
+### 3. Configure
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Edit `.env.local`:
+Set your provider in `.env.local`.
+
+OpenAI-compatible endpoint:
 
 ```env
-AWS_PROFILE=your-aws-profile   # named profile in ~/.aws/credentials
-AWS_REGION=us-east-1           # Bedrock region with Claude access
-AWS_MODEL_ID=your-bedrock-model-id
+AI_PROVIDER=openai
+AI_API_BASE=https://your-endpoint/v1
+AI_API_KEY=your-key
+AI_MODEL_ID=your-model
+AI_REASONING_ENABLED=false
+AI_REASONING_BUDGET=1024
 ```
 
-### 4. Set up the database
+AWS Bedrock:
 
-```bash
-npx prisma migrate dev
+```env
+AI_PROVIDER=bedrock
+AWS_PROFILE=your-profile
+AWS_REGION=us-east-1
+AWS_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+AI_REASONING_ENABLED=false
+AI_REASONING_BUDGET=1024
 ```
 
-### 5. Run
+Ollama:
+
+```env
+AI_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+AI_REASONING_ENABLED=false
+AI_REASONING_BUDGET=1024
+```
+
+### 4. Run
 
 ```bash
 npm run dev
-# → http://localhost:3000
+# http://localhost:3000
 ```
 
----
-
-## Features
-
-| Feature | Status |
-|---------|--------|
-| Full NLHE hand cycle (deal → showdown) | ✅ Live |
-| Legal betting — min-raise, all-in, side pots | ✅ Live |
-| Stack persistence across hands | ✅ Live |
-| Dealer button rotation per hand | ✅ Live |
-| 4 AI personality archetypes | ✅ Live |
-| AI action engine (Bedrock) | ✅ Live |
-| AI table talk between players | ✅ Live |
-| Dollar Bill real-time coaching | ✅ Live |
-| Inline speech bubbles on seat cards | ✅ Live |
-| Emoji avatars per archetype | ✅ Live |
-| Human rebuy (+1k) with P&L tracking | ✅ Live |
-| AI opponent rebuy buttons | ✅ Live |
-| Rebuy announcements — AIs react in chat | ✅ Live |
-| AI hole card leak protection | ✅ Live |
-| Speed control (slow / normal / fast) | ✅ Live |
-| Card reveal toggle (training mode) | ✅ Live |
-| Pre-session lobby + config | ✅ Live |
-| Session summary screen | ✅ Live |
-| SQLite persistence (Prisma) | ✅ Live |
-
----
-
-## Project Structure
-
-```
-app/
-├── lobby/         # Pre-session config & buy-ins
-├── game/          # Main game screen
-├── summary/       # End-of-session scorecard
-└── api/           # Server actions
-
-components/
-├── TableOval      # Felt surface — community cards, pot, dealer quip
-├── SeatCard       # Player tile — stack, cards, action, speech bubble
-├── PlayingCard    # Single card renderer (sm/md/lg/xl)
-├── ActionBar      # Human fold/check/call/bet controls
-├── ChatFeed       # Scrollable table talk log
-└── ChatInput      # Human chat input
-
-lib/
-├── game/          # Dealer engine — pure logic, no LLM
-└── ai/            # Bedrock adapter, prompt registry, opponent + coach logic
-
-stores/
-├── gameStore      # GameState, seat stacks, AI loop, patchSeatStack
-└── chatStore      # Chat messages, broadcastToTable
-
-constants/         # SEAT_ORDER, speed tiers, archetype presets
-types/             # Shared TypeScript interfaces
-prisma/            # Schema + migrations
-```
-
----
-
-## Dev Commands
+## Scripts
 
 ```bash
-npm run dev          # Start Next.js dev server
-npm run type-check   # TypeScript check (no emit)
-npm run lint         # ESLint
-npx prisma studio    # Browse SQLite data
-npx prisma migrate dev   # Run migrations
+npm run dev
+npm run lint
+npm run type-check
+npm run build
 ```
 
----
+## Project Layout
 
-## Design Principles
+```text
+app/            routes: lobby, game, summary, api
+components/     table UI, controls, chat
+lib/game/       deterministic poker engine
+lib/ai/         provider, coach, dealer, opponent logic
+stores/         zustand state stores
+constants/      archetypes and game constants
+types/          shared TypeScript types
+prisma/         schema + local DB
+```
 
-- **Speed first** — hands resolve fast, UI stays out of the way
-- **Human feel** — the table is alive; players bicker, needle, tilt
-- **Training-first** — every session produces a coach summary and P&L
-- **Spec before code** — all features planned in `plans/` before implementation
-- **750-line rule** — no file exceeds 750 lines (most are under 300)
+## Notes
 
----
-
-## PRD
-
-Full product spec: [prd.md](prd.md)
-
-## Private Planning Policy
-
-Dharma protocol assets are intentionally private and are not stored in this public repo.
-
-- `plans/`
-- `.github/instructions/`
-- `.github/agents/`
-- `.github/copilot-instructions.md`
-
-Source of truth for those files is `nosebleed-private`.
-
----
+- `tokens.md` and `score.md` are local run logs and ignored by git.
+- Planning/private instruction assets are intentionally blocked from this public repo.
 
 ## License
 

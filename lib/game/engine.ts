@@ -136,7 +136,8 @@ export function applyAction(
     case 'call': {
       const facing = maxBetOnStreet(s) - seat.currentBet
       const paid = Math.min(seat.stack, facing)
-      seats[seatId] = chipOut(seat, paid)
+      const calledSeat = chipOut(seat, paid)
+      seats[seatId] = calledSeat.stack === 0 ? { ...calledSeat, isAllIn: true } : calledSeat
       s = addToPot(s, paid)
       break
     }
@@ -144,7 +145,8 @@ export function applyAction(
     case 'raise': {
       const amount = action.amount!
       const extra = amount - seat.currentBet
-      seats[seatId] = chipOut(seat, extra)
+      const raisedSeat = chipOut(seat, extra)
+      seats[seatId] = raisedSeat.stack === 0 ? { ...raisedSeat, isAllIn: true } : raisedSeat
       s = addToPot(s, extra)
       s = { ...s, lastRaiseAmount: amount - maxBetOnStreet(state) }
       break
@@ -196,8 +198,14 @@ export function advanceStreet(state: GameState): GameState {
   if (nextStreet === 'showdown') return resolveHand(state)
 
   const cardsToAdd = nextStreet === 'flop' ? 3 : 1
+  const usedCards = new Set<string>()
+  for (const c of state.board) usedCards.add(`${c.rank}${c.suit}`)
+  for (const seat of Object.values(state.seats)) {
+    if (!seat.holeCards) continue
+    for (const c of seat.holeCards) usedCards.add(`${c.rank}${c.suit}`)
+  }
   const deck = shuffle(buildDeck()).filter(
-    c => !state.board.some(b => b.rank === c.rank && b.suit === c.suit),
+    c => !usedCards.has(`${c.rank}${c.suit}`),
   )
   const newBoard = [...state.board, ...deck.slice(0, cardsToAdd)]
 

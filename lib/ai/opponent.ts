@@ -159,8 +159,8 @@ export async function getOpponentDecision(
     const systemPrompt = resolvePrompt('opponent.action', {
       name: archetype.name,
       archetype: archetype.id,
-      personality: archetype.description,
-      style: archetype.description,
+      personality: archetype.personality,
+      style: archetype.label,
     })
 
     const userMessage = resolvePrompt('opponent.talk', {
@@ -173,7 +173,7 @@ export async function getOpponentDecision(
     const res = await callLLM({
       systemPrompt,
       userMessage,
-      maxTokens: 256,
+      maxTokens: 500,
     })
 
     if (!res.ok || !res.text) {

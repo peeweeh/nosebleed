@@ -121,13 +121,19 @@ export default function LobbyPage() {
               <select
                 value={archetypes[seatId]}
                 onChange={(e) => updateArchetype(seatId, e.target.value)}
+                title={`Opponent archetype for ${seatId.toUpperCase()}`}
+                aria-label={`Opponent archetype for ${seatId.toUpperCase()}`}
                 className="flex-1 bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded px-3 py-2 focus:outline-none focus:border-teal-400"
               >
-                {OPPONENT_ARCHETYPE_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {ARCHETYPES[id].name} — {ARCHETYPES[id].description}
-                  </option>
-                ))}
+                {OPPONENT_ARCHETYPE_IDS.map((id) => {
+                  const desc = ARCHETYPES[id].description
+                  const truncated = desc.length > 60 ? desc.slice(0, 57) + '…' : desc
+                  return (
+                    <option key={id} value={id}>
+                      {ARCHETYPES[id].name} — {truncated}
+                    </option>
+                  )
+                })}
               </select>
             </div>
           ))}
