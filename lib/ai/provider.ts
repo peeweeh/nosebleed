@@ -5,9 +5,11 @@ import { loadConfig, type ProviderConfig } from '@/lib/config'
 import fs from 'fs'
 import path from 'path'
 
-const TOKEN_LOG = path.join(process.cwd(), 'tokens.md')
+const LOG_DIR = path.join(process.cwd(), 'logs')
+const TOKEN_LOG = path.join(LOG_DIR, 'tokens.md')
 
 function logTokens(modelId: string, inputTokens: number, outputTokens: number) {
+  fs.mkdirSync(LOG_DIR, { recursive: true })
   const line = `| ${modelId} | ${inputTokens} | ${outputTokens} |\n`
   if (!fs.existsSync(TOKEN_LOG)) {
     fs.writeFileSync(TOKEN_LOG, '| model | input tokens | output tokens |\n|---|---|---|\n')

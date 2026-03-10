@@ -30,8 +30,7 @@ build/
 npm-debug.log*
 
 # Local run logs
-tokens.md
-score.md
+logs/
 yarn-debug.log*
 yarn-error.log*
 

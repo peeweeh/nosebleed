@@ -8,10 +8,12 @@ import path from 'path'
 
 export const runtime = 'nodejs'
 
-const SCORE_LOG = path.join(process.cwd(), 'score.md')
+const LOG_DIR = path.join(process.cwd(), 'logs')
+const SCORE_LOG = path.join(LOG_DIR, 'score.md')
 
 export async function POST(req: NextRequest) {
   try {
+    fs.mkdirSync(LOG_DIR, { recursive: true })
     const { handNumber, humanStack, stackBefore, winners, humanFolded, holeCards, board, coachAnalysis } = await req.json() as {
       handNumber: number
       humanStack: number

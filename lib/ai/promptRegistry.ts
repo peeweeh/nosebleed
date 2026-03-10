@@ -72,6 +72,12 @@ The message (from {{from_name}}): "{{message}}"
 
 Current game situation: {{game_state}}
 
+Recent conversation memory:
+{{chat_history}}
+
+Cross-game memory from prior hands:
+{{table_memory}}
+
 Respond ONLY with a JSON block:
 \`\`\`json
 {
@@ -83,6 +89,8 @@ Respond ONLY with a JSON block:
 Rules:
 - High talkiness (7+) means you respond more often. Low talkiness (3 or below) means you mostly stay quiet.
 - If the message is directed at you or insults/challenges you, ego pushes you to respond.
+- You may reference recent conversation or previous hands, but keep it short and natural.
+- Do not invent specific past outcomes that are not present in memory.
 - Stay in character. No strategy advice. One short sharp line or nothing.
 - Never include "talk" if respond is false.`,
 

@@ -12,6 +12,7 @@ export type ChatBroadcastOptions = {
   fromName: string
   state: GameState
   addMessage: (msg: ChatMessage) => void
+  conversationMemory?: ChatMessage[]
 }
 
 function gameStateSummary(state: GameState): string {
@@ -23,18 +24,27 @@ function gameStateSummary(state: GameState): string {
   ].join(' | ')
 }
 
-// Broadcast a message to every active AI seat — each independently responds.
+// Broadcast a message to every AI seat (even folded) — each independently responds.
 export async function broadcastToTable(opts: ChatBroadcastOptions): Promise<void> {
-  const { message, fromSeatId, fromName, state, addMessage } = opts
+  const { message, fromSeatId, fromName, state, addMessage, conversationMemory = [] } = opts
 
-  // Collect AI seats that are active and not the speaker
+  // Collect AI seats that are not the speaker; folded players can still table-talk.
   const aiSeats = Object.values(state.seats).filter(
-    s => s.id !== 'human' && s.id !== fromSeatId && !s.isFolded && s.archetypeId,
+    s => s.id !== 'human' && s.id !== fromSeatId && !!s.archetypeId,
   )
 
   if (aiSeats.length === 0) return
 
   const summary = gameStateSummary(state)
+  const recentPublicChat = conversationMemory
+    .filter((m) => m.visibility === 'public')
+    .slice(-20)
+    .map((m) => ({
+      sender: m.sender,
+      senderLabel: m.senderLabel,
+      message: m.message,
+      timestamp: m.timestamp,
+    }))
 
   // Fire all requests in parallel — each AI is isolated and decides alone
   const requests = aiSeats.map(async (seat, i) => {
@@ -52,6 +62,7 @@ export async function broadcastToTable(opts: ChatBroadcastOptions): Promise<void
           message,
           fromName,
           gameStateSummary: summary,
+          chatHistory: recentPublicChat,
         }),
       })
 

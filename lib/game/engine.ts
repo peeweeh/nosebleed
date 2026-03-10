@@ -291,6 +291,14 @@ function maxBetOnStreet(state: GameState): number {
 function isStreetOver(state: GameState): boolean {
   const active = SEAT_ORDER.filter(id => state.seats[id].isActive && !state.seats[id].isAllIn)
   if (active.length <= 1) return true
+  
+  // Check if all active players have acted on this street
+  const actedThisStreet = new Set(state.actionsThisStreet.map(a => a.seatId))
+  if (!active.every(id => actedThisStreet.has(id))) {
+    return false
+  }
+  
+  // All have acted; now check if all have matched the bet
   const max = maxBetOnStreet(state)
   return active.every(id => state.seats[id].currentBet === max)
 }

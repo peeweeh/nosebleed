@@ -87,6 +87,7 @@ async function runAILoop(
           fromName: senderName,
           state: next,
           addMessage,
+          conversationMemory: useChatStore.getState().messages,
         })
       }
 
