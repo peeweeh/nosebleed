@@ -227,6 +227,12 @@ export function advanceStreet(state: GameState): GameState {
   }
 
   emit({ type: 'STREET_DEALT', state: s })
+
+  // No seat can act (everyone else folded or all-in): run out streets immediately.
+  if (firstActor === null) {
+    return advanceStreet(s)
+  }
+
   return s
 }
 
@@ -303,7 +309,7 @@ function isStreetOver(state: GameState): boolean {
   return active.every(id => state.seats[id].currentBet === max)
 }
 
-function nextActiveSeat(state: GameState, current: SeatId): SeatId {
+function nextActiveSeat(state: GameState, current: SeatId): SeatId | null {
   const order = SEAT_ORDER
   const idx = order.indexOf(current)
   for (let i = 1; i < order.length; i++) {
@@ -312,10 +318,10 @@ function nextActiveSeat(state: GameState, current: SeatId): SeatId {
       return id
     }
   }
-  return current
+  return null
 }
 
-function firstToActPostflop(state: GameState): SeatId {
+function firstToActPostflop(state: GameState): SeatId | null {
   const order = SEAT_ORDER
   const dealerIdx = order.indexOf(state.dealerSeat)
   for (let i = 1; i <= order.length; i++) {
@@ -324,7 +330,7 @@ function firstToActPostflop(state: GameState): SeatId {
       return id
     }
   }
-  return state.dealerSeat
+  return null
 }
 
 function nextStreetAfter(street: Street): Street {

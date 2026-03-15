@@ -4,6 +4,7 @@
 import { create } from 'zustand'
 import { type GameState, type PlayerAction, type SeatId } from '@/types'
 import { startHand, applyAction } from '@/lib/game/engine'
+import { getLegalActions, isActionLegal } from '@/lib/game/actions'
 import { useChatStore } from '@/stores/chatStore'
 import { broadcastToTable } from '@/lib/ai/tableChat'
 
@@ -15,12 +16,69 @@ export const SPEED_OPTIONS: Record<string, [number, number]> = {
 }
 export type SpeedKey = keyof typeof SPEED_OPTIONS
 
+const AI_DECISION_TIMEOUT_MS = 15000
+
 let _speedKey: SpeedKey = 'normal'
 export function setAISpeed(key: SpeedKey) { _speedKey = key }
 
 function randomDelay(): number {
   const [min, max] = SPEED_OPTIONS[_speedKey]
   return min + Math.floor(Math.random() * (max - min))
+}
+
+function safeFallbackAction(state: GameState, seatId: SeatId): PlayerAction {
+  const legal = getLegalActions(state, seatId)
+  if (legal.canCall) return { type: 'call' }
+  if (legal.canCheck) return { type: 'check' }
+  return { type: 'fold' }
+}
+
+async function fetchAIDecision(
+  state: GameState,
+  seatId: SeatId,
+  chatHistory: ReturnType<typeof useChatStore.getState>['messages'],
+): Promise<{ action: PlayerAction; talk?: string }> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), AI_DECISION_TIMEOUT_MS)
+
+  try {
+    const res = await fetch('/api/ai/decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state, seatId, chatHistory }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      console.warn('[gameStore] AI decision request failed', res.status, seatId)
+      return { action: safeFallbackAction(state, seatId) }
+    }
+
+    const payload = await res.json() as {
+      action?: PlayerAction
+      talk?: string
+    }
+    const action = payload.action
+
+    if (!action || !isActionLegal(state, seatId, action)) {
+      console.warn('[gameStore] AI returned illegal decision', seatId, action)
+      return {
+        action: safeFallbackAction(state, seatId),
+        talk: typeof payload.talk === 'string' ? payload.talk : undefined,
+      }
+    }
+
+    return {
+      action,
+      talk: typeof payload.talk === 'string' ? payload.talk : undefined,
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    console.warn('[gameStore] AI decision request aborted or failed', seatId, reason)
+    return { action: safeFallbackAction(state, seatId) }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 interface GameStore {
@@ -52,21 +110,7 @@ async function runAILoop(
     ) {
       const seatId = next.activePlayer as SeatId
       const chatHistory = useChatStore.getState().messages
-
-      const res = await fetch('/api/ai/decision', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: next, seatId, chatHistory }),
-      })
-
-      if (!res.ok) {
-        // Fallback: fold on error so hand can continue
-        next = applyAction(next, seatId, { type: 'fold' })
-        set({ state: next })
-        continue
-      }
-
-      const decision = await res.json() as { action: PlayerAction; talk?: string }
+      const decision = await fetchAIDecision(next, seatId, chatHistory)
 
       if (decision.talk) {
         const senderName = next.seats[seatId]?.name ?? seatId
@@ -91,7 +135,12 @@ async function runAILoop(
         })
       }
 
-      next = applyAction(next, seatId, decision.action)
+      try {
+        next = applyAction(next, seatId, decision.action)
+      } catch (error) {
+        console.warn('[gameStore] applying AI action failed, using fallback', seatId, error)
+        next = applyAction(next, seatId, safeFallbackAction(next, seatId))
+      }
       set({ state: next })
 
       // Random delay — feels like the player is thinking
